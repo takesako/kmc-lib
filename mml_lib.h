@@ -13,7 +13,7 @@
 #define PI  3.14159265358979323846
 
 // 英小文字を大文字にする三項演算子マクロ
-#define UC(c) ((c)>='a'&&(c)<='z') ? ((c)-32) : (c)
+#define UC(c) (((c)>='a'&&(c)<='z') ? ((c)-32) : (c))
 
 // 数字の読み取り
 double read_number(const char **pp){
