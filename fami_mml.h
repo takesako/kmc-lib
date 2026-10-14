@@ -1,4 +1,4 @@
-// fami_mml.h - C99 header-only MML-to-WAV synthesizer for NES-style chiptune music
+// fami_mml.h - C99 header-only MML-to-WAV synthesizer for NES APU chiptune music
 // Copyright (c) 2026 Yoshinori Takesako
 // SPDX-License-Identifier: MIT OR BSD-3-Clause OR GPL-1.0-or-later
 #include <stdio.h>
@@ -956,7 +956,7 @@ static inline void _mml_free(MML *m) {
     for (int i = 0; i < 16; ++i) free(m->dpcm[i].data);
 }
 
-static inline void mml_text2wav(const char *wav_file, const char *text) {
+static inline void mml_text2wav(const char *text, const char *wav_file) {
     MML m = {0};
     if (!wav_file || !text) _mml_error(&m, "Null argument");
     _mml_parse(&m, text);
@@ -965,7 +965,7 @@ static inline void mml_text2wav(const char *wav_file, const char *text) {
     _mml_free(&m);
 }
 
-static inline void mml_file2wav(const char *wav_file, const char *mml_file) {
+static inline void mml_file2wav(const char *mml_file, const char *wav_file) {
     MML m = {0};
     if (!wav_file || !mml_file) _mml_error(&m, "Null argument");
     FILE *f = fopen(mml_file, "rb");
@@ -985,6 +985,6 @@ static inline void mml_file2wav(const char *wav_file, const char *mml_file) {
     if (memchr(text, '\0', got)) _mml_error(&m, "NUL in MML file");
     text[got] = '\0';
     unsigned bom = got >= 3 && text[0] == 0xef && text[1] == 0xbb && text[2] == 0xbf ? 3 : 0;
-    mml_text2wav(wav_file, (const char *)(text + bom));
+    mml_text2wav((const char *)(text + bom), wav_file);
     free(text);
 }
