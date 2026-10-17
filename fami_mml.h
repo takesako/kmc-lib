@@ -1,6 +1,9 @@
 // fami_mml.h - C99 header-only MML-to-WAV synthesizer for NES APU chiptune music
 // Copyright (c) 2026 Yoshinori Takesako
 // SPDX-License-Identifier: MIT OR BSD-3-Clause OR GPL-1.0-or-later
+
+#define FAMI_MML_VERSION "0.1.1"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -540,21 +543,21 @@ static inline void _mml_skip_repeat(MML *m) {
     _mml_error(m, "Unclosed repeat");
 }
 
-static inline void _mml_parse(MML *m, const char *text) {
-    int tracks = 0;
-    unsigned steps = 0;
+typedef struct { MMLSettings s; unsigned steps; int tracks, active; } MMLParseState;
+
+static inline void _mml_parse(MML *m, const char *text, MMLParseState *ps) {
     m->text = m->p = m->at = text;
     for (;;) {
-        MMLSettings s = {4,100,127,0,8,0,0,15,0,3,50,0,0,-1,0,0,96u*MML_TICK,{0,60u*MML_RATE/127u,MML_RATE/127u,30.0f/127.0f},{0},-1,0,-1,0,0,0,0,-1};
+        MMLSettings s = ps->active ? ps->s : (MMLSettings){4,100,127,0,8,0,0,15,0,3,50,0,0,-1,0,0,96u*MML_TICK,{0,60u*MML_RATE/127u,MML_RATE/127u,30.0f/127.0f},{0},-1,0,-1,0,0,0,0,-1};
         _mml_skip_space(m);
         m->at = m->p;
         if (!*m->p) break;
         if (*m->p == '#') {
-            if (++steps > MML_MAX_STEPS) _mml_error(m, "Too many commands");
+            if (++ps->steps > MML_MAX_STEPS) _mml_error(m, "Too many commands");
             _mml_wav9(m);
             continue;
         }
-        if (++tracks > MML_CHANNELS) _mml_error(m, "Too many tracks");
+        if (!ps->active && ++ps->tracks > MML_CHANNELS) _mml_error(m, "Too many tracks");
         MMLRepeat repeat[8] = {{0}};
         int depth = 0;
         for (;;) {
@@ -562,7 +565,7 @@ static inline void _mml_parse(MML *m, const char *text) {
             m->at = m->p;
             int c = _toupper(*m->p);
             if (!c || c == ';') break;
-            if (++steps > MML_MAX_STEPS) _mml_error(m, "Too many commands");
+            if (++ps->steps > MML_MAX_STEPS) _mml_error(m, "Too many commands");
             if (c == '#') { _mml_wav9(m); continue; }
             if (m->p[0] == '/' && m->p[1] == ':') {
                 m->p += 2;
@@ -591,11 +594,20 @@ static inline void _mml_parse(MML *m, const char *text) {
             else _mml_read_command(m, &s, c);
         }
         if (depth) _mml_error(m, "Unclosed repeat");
-        if (s.slur) _mml_error(m, "Unfinished slur");
-        if (s.port_pending) _mml_error(m, "Unfinished portamento");
         if (s.tick > m->end) m->end = s.tick;
-        if (*m->p == ';') ++m->p;
+        ps->s = s;
+        ps->active = *m->p != ';';
+        if (!ps->active) {
+            if (s.slur) _mml_error(m, "Unfinished slur");
+            if (s.port_pending) _mml_error(m, "Unfinished portamento");
+            ++m->p;
+        }
     }
+}
+
+static inline void _mml_parse_finish(MML *m, MMLParseState *ps) {
+    if (ps->active && ps->s.slur) _mml_error(m, "Unfinished slur");
+    if (ps->active && ps->s.port_pending) _mml_error(m, "Unfinished portamento");
     for (unsigned i = 0; i < m->track[4].count; ++i) {
         MMLNote *n = &m->track[4].note[i];
         if (!m->dpcm[n->wave].size) { m->at = n->at; _mml_error(m, "Missing #WAV9 sample"); }
@@ -956,14 +968,24 @@ static inline void _mml_free(MML *m) {
     for (int i = 0; i < 16; ++i) free(m->dpcm[i].data);
 }
 
-static inline void mml_text2wav(const char *text, const char *wav_file) {
+static inline void _mml_texts2wav(const char **s, size_t n) {
     MML m = {0};
-    if (!wav_file || !text) _mml_error(&m, "Null argument");
-    _mml_parse(&m, text);
+    MMLParseState ps = {0};
+    if (n < 2) _mml_error(&m, "Missing arguments");
+    for (size_t i = 0; i < n - 1; ++i) {
+        if (!s[i]) _mml_error(&m, "Null argument");
+        _mml_parse(&m, s[i], &ps);
+    }
+    if (!s[n - 1]) _mml_error(&m, "Null argument");
+    _mml_parse_finish(&m, &ps);
     _mml_schedule(&m);
-    _mml_render(&m, wav_file);
+    _mml_render(&m, s[n - 1]);
     _mml_free(&m);
 }
+
+#define mml_text2wav(...) \
+    _mml_texts2wav((const char *[]){__VA_ARGS__}, \
+            sizeof((const char *[]){__VA_ARGS__}) / sizeof(char *))
 
 static inline void mml_file2wav(const char *mml_file, const char *wav_file) {
     MML m = {0};
