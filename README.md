@@ -15,6 +15,7 @@ These libraries are designed to help students learn C programming through hands-
 | [`lib_bmp16.h`](lib_bmp16.h) | 16-color BMP image generation |
 | [`lib_png16.h`](lib_png16.h) | 16-color PNG image generation |
 | [`lib_pav.h`](lib_pav.h) | Palette Animation Video (PAV) encoding and decoding |
+| [`lib_macio.h`](https://github.com/takesako/kmc-lib/blob/main/lib_macio.h) | macOS keyboard input and sound synthesis |
 | [`mml_lib.h`](mml_lib.h) | Music Macro Language (MML) to WAV audio generation |
 | [`fami_mml.h`](fami_mml.h) | Famicom-style sound synthesis and MML to WAV conversion |
 
